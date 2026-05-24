@@ -2,24 +2,32 @@ pipeline {
     agent any
 
     environment {
-        IMAGE_NAME = "SWAHA05/flask-app"
-        IMAGE_TAG = "latest"
+        // This sets up all three properties so your script can read them seamlessly
+        DOCKER_IMAGE = 'swaha05/flask-app'
+        IMAGE_NAME   = 'swaha05/flask-app'
+        IMAGE_TAG    = 'latest'
     }
 
     stages {
+        stage('Checkout SCM') {
+            steps {
+                git branch: 'main', url: 'https://github.com/SWAHA161/Flask-App.git'
+            }
+        }
 
         stage('Build Docker Image') {
             steps {
-                sh 'docker build -t $IMAGE_NAME:$IMAGE_TAG .'
+                echo 'Building container image...'
+                sh "docker build -t \$IMAGE_NAME:\$IMAGE_TAG ."
             }
         }
 
         stage('Push Docker Image') {
             steps {
                 script {
+                    // Logs in using your working lowercase credential ID
                     docker.withRegistry('https://index.docker.io/v1/', 'dockerhub-creds') {
-                        // Fixed here: changed DOCKER_IMAGE to IMAGE_NAME
-                        docker.image("${IMAGE_NAME}:${IMAGE_TAG}").push()
+                        docker.image("\$IMAGE_NAME:\$IMAGE_TAG").push()
                     }
                 }
             }
@@ -27,20 +35,18 @@ pipeline {
 
         stage('Deploy Using Ansible') {
             steps {
-                sh '''
-                ansible-playbook -i ansible/inventory ansible/deploy.yml
-                '''
+                echo 'Deploying to environment...'
+                sh "ansible-playbook -i inventory deployment-playbook.yml"
             }
         }
     }
 
     post {
         success {
-            echo 'Pipeline executed successfully!'
+            echo 'Pipeline build and deployment completed smoothly!'
         }
-
         failure {
-            echo 'Pipeline failed!'
+            echo 'Pipeline build failed.'
         }
     }
 }
